@@ -1,0 +1,3 @@
+[submodule "TeamAT_atComm"]
+	path = TeamAT_atComm
+	url = https://github.com/TowerCIRRIS/TeamAT_atComm.git
