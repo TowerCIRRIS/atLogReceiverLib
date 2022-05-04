@@ -39,7 +39,7 @@ atComm comm(maxPacketSize);
 int main(void)
 {
 
-	bool running = true;
+	bool dataToReceive = true;
 	cout << "\n\r ----------------STARTING------------------";
 
 	serialHandle = open_serial_port(device, 460800);//CreateFile("COM6", GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
@@ -62,77 +62,109 @@ int main(void)
 	    }
 
 	    Sleep(2000);
-	SSIZE_T dataCount;
+	SSIZE_T readSize;
 
 
 	comm.resetBuffer();
 
+	// Envoyer la commande pour ¸recevoir le data
 	write_port(serialHandle, (uint8_t*)"\r", 1); // in case something was typed before
 	Sleep(100);
 
 	char outData[] = "downloaddata Data0002.dat\r";
 
-	uint8_t dataIn[20000];
+#define DATA_BUFFER_SIZE	20000
+
+	uint8_t dataIn[DATA_BUFFER_SIZE];
 	uint32_t dataIndex = 0;
 
 	flushPort(serialHandle);
 	write_port(serialHandle, (uint8_t*)outData, sizeof(outData));
 
+
+	// Réceptionn des données
 	bool fileOpened = false;
 	ofstream outfile;
 
-
-
-
-	while(running)
+	if(!fileOpened)
 	{
-		dataCount = read_port(serialHandle, inBuffer, IN_BUFFER_SIZE);
-		//flushPort(serialHandle);
-		if(dataCount > 0)
+		cout << "\n\rData receive, open file";
+		fileOpened = true;
+		outfile.open("outFile.dat",std::ios::binary);
+	}
+
+	//Réception des paquets
+	while(dataToReceive)
+	{
+		//Recevoir Data in indique longueur
+		readSize = read_port(serialHandle, inBuffer, IN_BUFFER_SIZE);
+
+		if(readSize > 0)
 		{
-
-			for(int i = 0; i < dataCount; i++)
+			for(int i = 0; i < readSize; i++)
 			{
+				comm.addReceivedBytes(&inBuffer[i], 1); //todo fix le cas ou les bytes débordent
 
-				comm.addReceivedBytes(&inBuffer[i], 1);
-
-				if(comm.dataAvailable())
+				if(comm.packetIsComplete())
 				{
-					if(!fileOpened)
+					int packetDataCount = comm.getDataCount();
+					if(packetDataCount)
 					{
-						cout << "\n\rData receive, open file";
-						fileOpened = true;
-						outfile.open("outFile.dat",std::ios::binary);
-					}
-					dataInfo_t tempDataInfo;
-					comm.getDataInfo(0, &tempDataInfo);
+						dataInfo_t tempDataInfo;
 
-					int datalen = comm.getData(tempDataInfo, &dataIn[dataIndex], 20000-dataIndex);
-					if(datalen >= 0)
-					{
-						dataIndex += datalen;
-
-						if(comm.getLastPacketStatus())
+						for(int packetSelect = 0 ; packetSelect < packetDataCount; packetSelect++)
 						{
-							cout << "\n\rLast packet received";
-							running = false;
+							comm.getDataInfo(packetSelect, &tempDataInfo);
+
+							int datalen = comm.getData(tempDataInfo, &dataIn[dataIndex], DATA_BUFFER_SIZE - dataIndex);
+
+							if(datalen >= 0)
+							{
+								dataIndex += datalen;
+
+								// Regarder si c'est le dernier paquet du groupe de paquets à recevoir.
+								if(comm.getLastPacketStatus())
+								{
+									dataToReceive = false;
+								}
+							}
+							else
+							{
+								cout << "\n\rData Length error";
+							}
 						}
 
-
+//						comm.getDataInfo(0, &tempDataInfo);
+//
+//						int datalen = comm.getData(tempDataInfo, &dataIn[dataIndex], 20000-dataIndex);
+//						if(datalen >= 0)
+//						{
+//							dataIndex += datalen;
+//
+//							if(comm.getLastPacketStatus())
+//							{
+//								cout << "\n\rLast packet received";
+//								running = false;
+//							}
+//						}
+//						else
+//						{
+//							cout << "\n\rData Length error";
+//						}
 					}
 					else
 					{
-						cout << "\n\rData Length error";
+						//Si le paquet est vide, regarde unituqment les status
+						if(comm.getLastPacketStatus())
+						{
+							dataToReceive = false;
+						}
 					}
 
 					comm.resetBuffer(); // reset for next iteration;
 				}
 			}
-
-
-
 		}
-
 	}
 
 	if(fileOpened)
@@ -147,8 +179,6 @@ int main(void)
 			datToCsv();
 
 	}
-
-
 
 
 	CloseHandle(serialHandle);

@@ -36,7 +36,8 @@ void datToCsv()
 
 	 uint32_t dataStructSize = 0;
 	 uint32_t datacount = 0;
-	 char inBuffer[5];
+	 char inBuffer[1000];
+	 char outBuffer[1000];
 	 uint8_t dataTypesTable[50+1];
 	 uint8_t testDataTable[50];
 
@@ -45,90 +46,172 @@ void datToCsv()
 
 	ifstream ifile;
 
-	csvfile.open("convertFile.csv");
 
 
 	ifile.open("outFile.dat", std::ios::binary);
-	//std::ifstream bin_file("outFile.dat", std::ios::binary);
-
-//	if (bin_file.good()) {
-//		/*Read Binary data using streambuffer iterators.*/
-//		std::vector<uint8_t> v_buf((std::istreambuf_iterator<char>(bin_file)), (std::istreambuf_iterator<char>()));
-//		//vec_buf = v_buf;
-//		bin_file.close();
-//
-//		v_buf.
-//
-//	else {
-//		throw std::exception();
-//	}
 
 	if(ifile.is_open())
 	{
-		ifile.get(inBuffer, 4+1);//ifile.get((char*)&dataStructSize, 4);
-			//            if(readCount >0 ) { // Read data structure size
+		csvfile.open("convertFile.csv");
+
+		ifile.read(inBuffer, 4);
 		dataStructSize = *(uint32_t*)inBuffer;
-		ifile.get(inBuffer, 4+1);//ifile.get((char*)&datacount, 4);
+
+		ifile.read(inBuffer, 4);
 		datacount = *(uint32_t*)inBuffer;
+
+		ifile.read((char*)dataTypesTable, datacount);
+
+		char titleName[50];
+
+		for(uint32_t ii = 0 ; ii < datacount; ii++)
+		{
+
+			if(ifile.getline(titleName, 50))
+			{
+				int readLen = ifile.gcount(); // strlen(titleName);
+
+				switch(dataTypesTable[ii])        {
+					case logDataType_float:
+						sprintf(&titleName[readLen-1],"(float),");
+						break;
+
+					case logDataType_int:
+						sprintf(&titleName[readLen-1],"(int),");
+						break;
+
+					case logDataType_uInt:
+						sprintf(&titleName[readLen-1],"(uint),");
+						break;
+
+					case logDataType_char:
+						sprintf(&titleName[readLen-1],"(char),");
+						break;
+
+					case logDataType_int64:
+						sprintf(&titleName[readLen-1],"(int64),");
+						break;
+					case logDataType_uint64:
+						sprintf(&titleName[readLen-1],"(uint64),");
+						break;
+
+					default:
+						sprintf(&titleName[readLen-1],"(?),");
+						break;
+				}
+			}
+
+			csvfile.write(titleName,strlen(titleName));
+			cout << "writing titles";
+
+		}
+
+		titleName[0] = '\n';
+		titleName[1] = '\0';
+
+		csvfile.write(titleName,1);
+
+		int lineCount = 0;
+		bool datatoReadinFile = true;
+		while(datatoReadinFile)
+		{
+			ifile.read(inBuffer, dataStructSize);
+			int readChar = ifile.gcount();
+			if(readChar > 0){
+
+				int datalen = binToCharDataConvert((uint8_t*)inBuffer, outBuffer, dataTypesTable, datacount);
+				outBuffer[datalen] = '\n';
+				datalen++;
+				outBuffer[datalen] = '\0';
+				csvfile.write(outBuffer,datalen);
+				lineCount++;
+
+			}
+			else
+			{
+				datatoReadinFile = false;
+			}
+		}
+
+		cout << "\n\r Final line count:" << lineCount;
+
+
+
+		csvfile.close();
+		ifile.close();
+
 	}
 
 
-	//            	if(readCount) { // Read type data count
-	ifile.get((char*)dataTypesTable, datacount+1); // load data types table
-
-	                    for(uint32_t ii = 0 ; ii< datacount; ii++)
-	                    {
-	                        char titleName[50];
-	                    	//string titleName[50];
-	                        //int readLen = ifile.getline(titleName, 50);
-	                        //int readLen = getline(ifile,titleName);
-	                        //if(readLen)
-	                        if(ifile.getline(titleName, 50))
-	                        {
-	                        	int readLen = strlen(titleName);
-
-	                            switch(dataTypesTable[ii])        {
-	                                case logDataType_float:
-	                                    sprintf(&titleName[readLen-1],"(float),");
-	                                    break;
-
-	                                case logDataType_int:
-	                                    sprintf(&titleName[readLen-1],"(int),");
-	                                    break;
-
-	                                case logDataType_uInt:
-	                                    sprintf(&titleName[readLen-1],"(uint),");
-	                                    break;
-
-	                                case logDataType_char:
-	                                    sprintf(&titleName[readLen-1],"(char),");
-	                                    break;
-
-	                                case logDataType_int64:
-	                                    sprintf(&titleName[readLen-1],"(int64),");
-	                                    break;
-	                                case logDataType_uint64:
-	                                    sprintf(&titleName[readLen-1],"(uint64),");
-	                                    break;
-
-	                                default:
-	                                    sprintf(&titleName[readLen-1],"(?),");
-	                                    break;
-	                            }
-	                        }
-
-	                        csvfile.write(titleName,strlen(titleName));
-	                        cout << "writing titles";
-//	                        sdLogger_serialOut(titleName);
-	                    }
-//	                    char serialdata[200];
-//	                    sprintf(serialdata,"\n\r\tStucture size:%lu, data types: %lu",dataStructSize, datacount);
-//	                    debugPrint(serialdata);
-//	                    debugPrint("\n\r");
-	             //   }
-	           // }
 
 
-	        	csvfile.close();
-	        	ifile.close();
+}
+
+
+uint32_t binToCharDataConvert(const uint8_t* binData, char* charData, uint8_t* dataTypesTable, uint32_t dataTypeCount)
+{
+    uint32_t dataPtr = 0;
+	uint32_t targetPtr = 0;
+
+    uint32_t uData;
+    float  fData;
+    int    intData;
+    char cData;
+    uint32_t nbCarWritten = 0;
+    int64_t i64Data;
+    uint64_t u64Data;
+
+	for(uint32_t i = 0 ; i < dataTypeCount; i++)
+	{
+        switch(dataTypesTable[i])
+        {
+            case logDataType_float:
+                fData = *(float*)&binData[dataPtr];
+                nbCarWritten = sprintf(&charData[targetPtr],"%f,", fData);
+                targetPtr += nbCarWritten;
+                dataPtr+= sizeof(float);
+                break;
+
+            case logDataType_int:
+                intData = *(int*)&binData[dataPtr];
+                nbCarWritten = sprintf(&charData[targetPtr],"%d,", intData);
+                targetPtr += nbCarWritten;
+                dataPtr+= sizeof(int);
+                break;
+
+            case logDataType_uInt:
+                uData = *(uint32_t*)&binData[dataPtr];
+                nbCarWritten = sprintf(&charData[targetPtr],"%u,", uData);
+                targetPtr += nbCarWritten;
+                dataPtr+= sizeof(uint32_t);
+                break;
+
+            case logDataType_char:
+                cData = *(char*)&binData[dataPtr];
+                nbCarWritten = sprintf(&charData[targetPtr],"%c,", cData);
+                targetPtr += nbCarWritten;
+                dataPtr+= sizeof(char);
+                break;
+
+            case logDataType_int64:
+                i64Data = *(int64_t*)&binData[dataPtr];
+                nbCarWritten = sprintf(&charData[targetPtr],"%lld,", i64Data);
+                targetPtr += nbCarWritten;
+                dataPtr+= sizeof(int64_t);
+                break;
+            case logDataType_uint64:
+                u64Data = *(uint64_t*)&binData[dataPtr];
+                nbCarWritten = sprintf(&charData[targetPtr],"%llu,", u64Data);
+                targetPtr += nbCarWritten;
+                dataPtr+= sizeof(uint64_t);
+                break;
+
+
+            default:
+                break;
+        }
+
+	}
+
+    return targetPtr;
 }
