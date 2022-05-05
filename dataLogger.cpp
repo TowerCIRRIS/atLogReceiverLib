@@ -31,7 +31,7 @@ using namespace std;
    #define logDataType_char        5
 
 
-void datToCsv()
+void datToCsv(const char* inputFile, const char* outputFile, bool showTypes)
 {
 
 	 uint32_t dataStructSize = 0;
@@ -48,63 +48,76 @@ void datToCsv()
 
 
 
-	ifile.open("outFile.dat", std::ios::binary);
+	//ifile.open("outFile.dat", std::ios::binary);
+	ifile.open(inputFile, std::ios::binary);
 
 	if(ifile.is_open())
 	{
-		csvfile.open("convertFile.csv");
+		//csvfile.open("convertFile.csv");
+		csvfile.open(outputFile);
 
-		ifile.read(inBuffer, 4);
-		dataStructSize = *(uint32_t*)inBuffer;
+		// Entête du fichier
+			//Grosseur de la structure de données
+			ifile.read(inBuffer, 4);
+			dataStructSize = *(uint32_t*)inBuffer;
 
-		ifile.read(inBuffer, 4);
-		datacount = *(uint32_t*)inBuffer;
+			// Nombre de données dans la structure
+			ifile.read(inBuffer, 4);
+			datacount = *(uint32_t*)inBuffer;
 
-		ifile.read((char*)dataTypesTable, datacount);
+			// Table des types de données
+			ifile.read((char*)dataTypesTable, datacount);
 
-		char titleName[50];
-
-		for(uint32_t ii = 0 ; ii < datacount; ii++)
-		{
-
-			if(ifile.getline(titleName, 50))
+			// Extraction des titres de colonnes / nom des données
+			char titleName[50];
+			for(uint32_t ii = 0 ; ii < datacount; ii++)
 			{
-				int readLen = ifile.gcount(); // strlen(titleName);
+				if(ifile.getline(titleName, 50))
+				{
+					int readLen = ifile.gcount(); // strlen(titleName);
 
-				switch(dataTypesTable[ii])        {
-					case logDataType_float:
-						sprintf(&titleName[readLen-1],"(float),");
-						break;
+					// Ajout du type entre parenthèse à coté du titre (optionnel)
+					if(showTypes)
+					{
+						switch(dataTypesTable[ii])        {
+							case logDataType_float:
+								sprintf(&titleName[readLen-1],"(float),");
+								break;
 
-					case logDataType_int:
-						sprintf(&titleName[readLen-1],"(int),");
-						break;
+							case logDataType_int:
+								sprintf(&titleName[readLen-1],"(int),");
+								break;
 
-					case logDataType_uInt:
-						sprintf(&titleName[readLen-1],"(uint),");
-						break;
+							case logDataType_uInt:
+								sprintf(&titleName[readLen-1],"(uint),");
+								break;
 
-					case logDataType_char:
-						sprintf(&titleName[readLen-1],"(char),");
-						break;
+							case logDataType_char:
+								sprintf(&titleName[readLen-1],"(char),");
+								break;
 
-					case logDataType_int64:
-						sprintf(&titleName[readLen-1],"(int64),");
-						break;
-					case logDataType_uint64:
-						sprintf(&titleName[readLen-1],"(uint64),");
-						break;
+							case logDataType_int64:
+								sprintf(&titleName[readLen-1],"(int64),");
+								break;
+							case logDataType_uint64:
+								sprintf(&titleName[readLen-1],"(uint64),");
+								break;
 
-					default:
-						sprintf(&titleName[readLen-1],"(?),");
-						break;
+							default:
+								sprintf(&titleName[readLen-1],"(?),");
+								break;
+						}
+					}
+					else
+					{
+						sprintf(&titleName[readLen-1],",");
+					}
+
 				}
+
+				csvfile.write(titleName,strlen(titleName));
+
 			}
-
-			csvfile.write(titleName,strlen(titleName));
-			cout << "writing titles";
-
-		}
 
 		titleName[0] = '\n';
 		titleName[1] = '\0';

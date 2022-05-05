@@ -28,11 +28,11 @@ HANDLE serialHandle;
 
 const char * device = "\\\\.\\COM5";
 
-#define IN_BUFFER_SIZE 512
+#define IN_BUFFER_SIZE 10000
 uint8_t inBuffer[IN_BUFFER_SIZE];
 string dataOut[256];
 
-#define maxPacketSize 1000
+#define maxPacketSize 10000
 
 atComm comm(maxPacketSize);
 
@@ -71,9 +71,9 @@ int main(void)
 	write_port(serialHandle, (uint8_t*)"\r", 1); // in case something was typed before
 	Sleep(100);
 
-	char outData[] = "downloaddata Data0002.dat\r";
+	char outData[] = "downloaddata Data0003.dat\r";
 
-#define DATA_BUFFER_SIZE	20000
+#define DATA_BUFFER_SIZE	200000
 
 	uint8_t dataIn[DATA_BUFFER_SIZE];
 	uint32_t dataIndex = 0;
@@ -94,6 +94,10 @@ int main(void)
 	}
 
 	//Réception des paquets
+	comm.resetBuffer(); // reset pour le nouveau paquet;
+
+	uint32_t packetNumber = 0;
+	uint32_t rxPacketNumber = 0;
 	while(dataToReceive)
 	{
 		//Recevoir Data in indique longueur
@@ -112,56 +116,85 @@ int main(void)
 					{
 						dataInfo_t tempDataInfo;
 
+
 						for(int packetSelect = 0 ; packetSelect < packetDataCount; packetSelect++)
 						{
+							// Ajoute le data au buffer.
 							comm.getDataInfo(packetSelect, &tempDataInfo);
-
-							int datalen = comm.getData(tempDataInfo, &dataIn[dataIndex], DATA_BUFFER_SIZE - dataIndex);
-
-							if(datalen >= 0)
+							if(tempDataInfo.dataType == SDLOGGER_COMM_DATA_TYPE_MESSAGE_COUNT)
 							{
-								dataIndex += datalen;
+								int datalen = comm.getData(packetSelect,&rxPacketNumber,sizeof(rxPacketNumber));
 
-								// Regarder si c'est le dernier paquet du groupe de paquets à recevoir.
-								if(comm.getLastPacketStatus())
+								if(rxPacketNumber != packetNumber)
 								{
+									cout << "\n\rPacket missing" << packetNumber;
 									dataToReceive = false;
+									outfile.close();
+									fileOpened = false;
 								}
+							}
+							else if (tempDataInfo.dataType == SDLOGGER_COMM_DATA_TYPE_BINARYLOGDATA)
+							{
+								int datalen = comm.getData(packetSelect, &dataIn[dataIndex], DATA_BUFFER_SIZE - dataIndex);
+
+								if(datalen >= 0)
+								{
+									dataIndex += datalen;
+									packetNumber++;
+									write_port(serialHandle, (uint8_t*)"\r", 1); //ACK
+									// Regarder si c'est le dernier paquet du groupe de paquets à recevoir.
+//									if(comm.getLastPacketStatus())
+//									{
+//										dataToReceive = false;
+//									}
+								}
+								else
+								{
+									cout << "\n\rData Length error";
+									dataToReceive = false;
+									outfile.close();
+									fileOpened = false;
+								}
+							}
+							else if (tempDataInfo.dataType == SDLOGGER_COMM_DATA_TYPE_EMPTY)
+							{
+//								if(comm.getLastPacketStatus())
+//								{
+//									dataToReceive = false;
+//								}
 							}
 							else
 							{
-								cout << "\n\rData Length error";
+								cout << "\n\rData type error";
+								dataToReceive = false;
+								outfile.close();
+								fileOpened = false;
 							}
+
 						}
 
-//						comm.getDataInfo(0, &tempDataInfo);
-//
-//						int datalen = comm.getData(tempDataInfo, &dataIn[dataIndex], 20000-dataIndex);
-//						if(datalen >= 0)
+//						if(comm.getLastPacketStatus())
 //						{
-//							dataIndex += datalen;
-//
-//							if(comm.getLastPacketStatus())
-//							{
-//								cout << "\n\rLast packet received";
-//								running = false;
-//							}
+//							dataToReceive = false;
 //						}
-//						else
-//						{
-//							cout << "\n\rData Length error";
-//						}
+
 					}
 					else
 					{
-						//Si le paquet est vide, regarde unituqment les status
-						if(comm.getLastPacketStatus())
-						{
-							dataToReceive = false;
-						}
+//						//Si le paquet est vide, regarde unituqment les status
+//						if(comm.getLastPacketStatus())
+//						{
+//							dataToReceive = false;
+//						}
 					}
 
-					comm.resetBuffer(); // reset for next iteration;
+					// Regarder si c'est le dernier paquet du groupe de paquets à recevoir.
+					if(comm.getLastPacketStatus())
+					{
+						dataToReceive = false;
+					}
+
+					comm.resetBuffer(); // reset pour le prochain paquet au besoin;
 				}
 			}
 		}
@@ -169,15 +202,13 @@ int main(void)
 
 	if(fileOpened)
 	{
-
 			//cout << ((char*)dataIn)[i];
 			cout << "\n\r Writing file";
 			outfile.write((char*)dataIn,dataIndex);
 			outfile.close();
 			Sleep(100);
 
-			datToCsv();
-
+			datToCsv("outFile.dat","convertFile.csv",false);
 	}
 
 
