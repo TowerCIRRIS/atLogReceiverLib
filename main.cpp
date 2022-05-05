@@ -22,6 +22,13 @@ using namespace std;
 
 #include <fstream>
 
+#include <chrono>
+#include <sys/time.h>
+#include <ctime>
+
+using namespace std::chrono;
+
+
 #include "dataLogger.h"
 
 HANDLE serialHandle;
@@ -35,6 +42,11 @@ string dataOut[256];
 #define maxPacketSize 10000
 
 atComm comm(maxPacketSize);
+
+uint64_t getTimeMs()
+{
+	return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+}
 
 int main(void)
 {
@@ -68,6 +80,9 @@ int main(void)
 	comm.resetBuffer();
 
 	// Envoyer la commande pour ¸recevoir le data
+	flushPort(serialHandle);
+	write_port(serialHandle, (uint8_t*)"\r", 1); // in case something was typed before
+	Sleep(100);
 	write_port(serialHandle, (uint8_t*)"\r", 1); // in case something was typed before
 	Sleep(100);
 
@@ -96,8 +111,13 @@ int main(void)
 	//Réception des paquets
 	comm.resetBuffer(); // reset pour le nouveau paquet;
 
+#define MAX_RETRY 3
 	uint32_t packetNumber = 0;
 	uint32_t rxPacketNumber = 0;
+	uint32_t retryCount = 0;
+
+	uint64_t startTimeMs = getTimeMs();
+
 	while(dataToReceive)
 	{
 		//Recevoir Data in indique longueur
@@ -105,98 +125,105 @@ int main(void)
 
 		if(readSize > 0)
 		{
+			startTimeMs = getTimeMs();
 			for(int i = 0; i < readSize; i++)
 			{
-				comm.addReceivedBytes(&inBuffer[i], 1); //todo fix le cas ou les bytes débordent
+				int status = comm.addReceivedBytes(&inBuffer[i], 1); //todo fix le cas ou les bytes débordent
 
-				if(comm.packetIsComplete())
-				{
-					int packetDataCount = comm.getDataCount();
-					if(packetDataCount)
+				if (status < 0) {
+					cout << "\n\rRx error getting bytes: " << status;
+					comm.resetBuffer();
+					retryCount++;
+
+					if(retryCount >= MAX_RETRY)
 					{
-						dataInfo_t tempDataInfo;
+						cout << "\n\rMax retry reached, aborting.. Error: " << status;
+						dataToReceive = false;
+						outfile.close();
+						fileOpened = false;
+					}
+
+					break; // exit for
+
+				} else {
+					if (comm.packetIsComplete()) {
+						retryCount = 0; // Valid message received, clear retry counter for next errors
+						int packetDataCount = comm.getDataCount();
+						if (packetDataCount) {
+							dataInfo_t tempDataInfo;
+
+							bool sendAck = false;
+							for (int packetSelect = 0; packetSelect < packetDataCount; packetSelect++) {
+
+								// Ajoute le data au buffer.
+								comm.getDataInfo(packetSelect, &tempDataInfo);
+
+								if (tempDataInfo.dataType == SDLOGGER_COMM_DATA_TYPE_MESSAGE_COUNT) {
+									int datalen = comm.getData(packetSelect, &rxPacketNumber, sizeof(rxPacketNumber));
+
+									if (rxPacketNumber != packetNumber) {
+										cout << "\n\rPacket missmatch, aborting.. packet number:" << packetNumber;
+										dataToReceive = false;
+										outfile.close();
+										fileOpened = false;
+									}
+									sendAck = true;
+
+								} else if (tempDataInfo.dataType == SDLOGGER_COMM_DATA_TYPE_BINARYLOGDATA) {
+									int datalen = comm.getData(packetSelect, &dataIn[dataIndex],
+									DATA_BUFFER_SIZE - dataIndex);
+
+									if (datalen >= 0) {
+										dataIndex += datalen;
+										packetNumber++;
 
 
-						for(int packetSelect = 0 ; packetSelect < packetDataCount; packetSelect++)
-						{
-							// Ajoute le data au buffer.
-							comm.getDataInfo(packetSelect, &tempDataInfo);
-							if(tempDataInfo.dataType == SDLOGGER_COMM_DATA_TYPE_MESSAGE_COUNT)
-							{
-								int datalen = comm.getData(packetSelect,&rxPacketNumber,sizeof(rxPacketNumber));
+									} else {
+										cout << "\n\rData Length error, aborting..";
+										dataToReceive = false;
+										outfile.close();
+										fileOpened = false;
+									}
+								} else if (tempDataInfo.dataType == SDLOGGER_COMM_DATA_TYPE_EMPTY) {
 
-								if(rxPacketNumber != packetNumber)
-								{
-									cout << "\n\rPacket missing" << packetNumber;
+								} else {
+									cout << "\n\rData type error, aborting..";
 									dataToReceive = false;
 									outfile.close();
 									fileOpened = false;
 								}
 							}
-							else if (tempDataInfo.dataType == SDLOGGER_COMM_DATA_TYPE_BINARYLOGDATA)
-							{
-								int datalen = comm.getData(packetSelect, &dataIn[dataIndex], DATA_BUFFER_SIZE - dataIndex);
 
-								if(datalen >= 0)
-								{
-									dataIndex += datalen;
-									packetNumber++;
-									write_port(serialHandle, (uint8_t*)"\r", 1); //ACK
-									// Regarder si c'est le dernier paquet du groupe de paquets à recevoir.
-//									if(comm.getLastPacketStatus())
-//									{
-//										dataToReceive = false;
-//									}
-								}
-								else
-								{
-									cout << "\n\rData Length error";
-									dataToReceive = false;
-									outfile.close();
-									fileOpened = false;
-								}
-							}
-							else if (tempDataInfo.dataType == SDLOGGER_COMM_DATA_TYPE_EMPTY)
+							if(sendAck)
 							{
-//								if(comm.getLastPacketStatus())
-//								{
-//									dataToReceive = false;
-//								}
+								write_port(serialHandle, (uint8_t*) "\r", 1); //ACK
 							}
-							else
-							{
-								cout << "\n\rData type error";
-								dataToReceive = false;
-								outfile.close();
-								fileOpened = false;
-							}
+
+
+						} else {
 
 						}
 
-//						if(comm.getLastPacketStatus())
-//						{
-//							dataToReceive = false;
-//						}
+						// Regarder si c'est le dernier paquet du groupe de paquets à recevoir.
+						if (comm.getLastPacketStatus()) {
+							dataToReceive = false;
+						}
 
+						comm.resetBuffer(); // reset pour le prochain paquet au besoin;
 					}
-					else
-					{
-//						//Si le paquet est vide, regarde unituqment les status
-//						if(comm.getLastPacketStatus())
-//						{
-//							dataToReceive = false;
-//						}
-					}
-
-					// Regarder si c'est le dernier paquet du groupe de paquets à recevoir.
-					if(comm.getLastPacketStatus())
-					{
-						dataToReceive = false;
-					}
-
-					comm.resetBuffer(); // reset pour le prochain paquet au besoin;
 				}
+
 			}
+		}
+		else
+		{
+//			if(getTimeMs() - startTimeMs > 3000)
+//			{
+//				cout << "\n\rData reception timeout, aborting..";
+//				dataToReceive = false;
+//				outfile.close();
+//				fileOpened = false;
+//			}
 		}
 	}
 
