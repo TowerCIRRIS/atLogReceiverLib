@@ -217,13 +217,13 @@ int main(void)
 		}
 		else
 		{
-//			if(getTimeMs() - startTimeMs > 3000)
-//			{
-//				cout << "\n\rData reception timeout, aborting..";
-//				dataToReceive = false;
-//				outfile.close();
-//				fileOpened = false;
-//			}
+			if(getTimeMs() - startTimeMs > 3000)
+			{
+				cout << "\n\rData reception timeout, aborting..";
+				dataToReceive = false;
+				outfile.close();
+				fileOpened = false;
+			}
 		}
 	}
 
