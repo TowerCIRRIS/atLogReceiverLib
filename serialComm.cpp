@@ -7,17 +7,9 @@
 
 #include "serialComm.h"
 
-
-
-
-
-//using namespace std;
-
-//#include "serialProtocol.h"
-
 using namespace std;
 
-//HANDLE serialHandle;
+
 
 uint32_t flags;
 

@@ -41,19 +41,14 @@ void datToCsv(const char* inputFile, const char* outputFile, bool showTypes)
 	 uint8_t dataTypesTable[50+1];
 	 uint8_t testDataTable[50];
 
-
 	ofstream csvfile;
 
 	ifstream ifile;
 
-
-
-	//ifile.open("outFile.dat", std::ios::binary);
 	ifile.open(inputFile, std::ios::binary);
 
 	if(ifile.is_open())
 	{
-		//csvfile.open("convertFile.csv");
 		csvfile.open(outputFile);
 
 		// Entête du fichier
@@ -146,17 +141,12 @@ void datToCsv(const char* inputFile, const char* outputFile, bool showTypes)
 			}
 		}
 
-		cout << "\n\r Final line count:" << lineCount;
-
-
+		cout << "Final line count:" << lineCount << std::endl;
 
 		csvfile.close();
 		ifile.close();
 
 	}
-
-
-
 
 }
 
