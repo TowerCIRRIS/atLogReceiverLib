@@ -62,13 +62,16 @@ cout << "\n\r ----------------STARTING------------------" << std::endl;
 logRx.openComm("\\\\.\\COM5", 460800);
 
 vector<string> fileList;
-int fileCount = logRx.getFileList(fileList);
+int fileCount = logRx.refreshFileList();
+
+char filename[40];
 
 for(int i = 0; i < fileCount; i++)
 {
-	cout << "\nFile#" << i << ": " << fileList[i] << std::endl;
+	logRx.getFileName(i, filename);
+	cout << "\nFile#" << i << ": " << filename << std::endl;
 
-	logRx.downLoadData(fileList[i].c_str());
+	logRx.downLoadData(filename);
 
 	//logRx.reset();
 
