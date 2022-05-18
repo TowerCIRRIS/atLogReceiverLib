@@ -39,7 +39,7 @@ void datToCsv(const char* inputFile, const char* outputFile, bool showTypes)
 	 char inBuffer[1000];
 	 char outBuffer[1000];
 	 uint8_t dataTypesTable[50+1];
-	 uint8_t testDataTable[50];
+	 //uint8_t testDataTable[50];
 
 	ofstream csvfile;
 

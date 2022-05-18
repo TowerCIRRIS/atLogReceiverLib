@@ -31,7 +31,7 @@ public:
 	logReceiver(uint32_t maxPacketLenght, uint32_t maxDataBuffer = 200000);
 	virtual ~logReceiver();
 
-	bool openComm(const char * comPort, uint32_t baudRate);
+	bool openComm(int comPort, uint32_t baudRate);
 	void endComm();
 
 	bool reset();
@@ -40,7 +40,8 @@ public:
 	int getFileListCount();
 	int getFileName(int fileSelect,char* fileName);
 
-	bool downLoadData(const char* filename);
+	bool downloadDataByNumber(int dataNumber);
+	bool downloadDataByName(const char* filename);
 
 private:
 
@@ -56,6 +57,8 @@ private:
 	uint32_t mMaxPacketLen = 0;
 	uint32_t mMaxDataBuffer = 0;
 	atComm *comm;
+
+	bool mDirectFileWrite = false;
 
 	HANDLE serialHandle;
 

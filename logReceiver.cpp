@@ -27,7 +27,8 @@ logReceiver::logReceiver(uint32_t maxPacketLenght, uint32_t maxDataBuffer) {
 
 	comm = new atComm(maxPacketLenght);
 
-
+	mBaudRate = 460800;
+	serialHandle = NULL;
 
 }
 
@@ -41,9 +42,14 @@ logReceiver::~logReceiver() {
 
 
 
-bool logReceiver::openComm(const char *comPort, uint32_t baudRate) {
+bool logReceiver::openComm(int comPort, uint32_t baudRate) {
 
-	serialHandle = open_serial_port(comPort, baudRate);
+	char portNumber[5];
+	itoa(comPort, portNumber, 10);
+	string commName = string("\\\\.\\COM") + string(portNumber);
+	//cout << "\n\rtest Cout: "<< "\\\\.\\COM5";
+	cout << "\n\rComm name:" << commName;
+	serialHandle = open_serial_port(commName.c_str(), baudRate);
 	if (serialHandle == NULL) {
 		std::cout << "Error opening port "<< std::endl;
 		return false;
@@ -124,9 +130,6 @@ int logReceiver::refreshFileList()
 
 	Sleep(100);
 
-
-
-
 	string receivedData;
 
 	dataToReceive = true;
@@ -154,6 +157,8 @@ int logReceiver::refreshFileList()
 	    if(token.find(".dat") != std::string::npos)
 	    {
 	    	mFileList.push_back(token);
+
+	    	// cout << "File name:" <<  token << endl;
 	    	//mFileCount++;
 	    }
 
@@ -182,9 +187,21 @@ int logReceiver::getFileName(int fileSelect,char* fileName)
 }
 
 
-
-bool logReceiver::downLoadData(const char* filename)
+bool logReceiver::downloadDataByNumber(int dataNumber)
 {
+
+	if(dataNumber >= getFileListCount())
+	{
+		cout << "Error: Number out of bound, or file list not up to date.  Make sure file list has been refreshed firts. "<< std::endl;
+		return false;
+	}
+}
+
+
+bool logReceiver::downloadDataByName(const char* filename)
+{
+
+	mDirectFileWrite = true;
 
 	if (string(filename).find(".dat") == std::string::npos)
 	{
@@ -242,6 +259,7 @@ bool logReceiver::downLoadData(const char* filename)
 						cout << "Max retry reached, aborting.. Error: " << status<< std::endl;
 						dataToReceive = false;
 						outBinaryfile.close();
+						remove(filename);
 						//fileOpened = false;
 						return false;
 					}
@@ -268,6 +286,7 @@ bool logReceiver::downLoadData(const char* filename)
 										cout << "Packet missmatch, aborting.. packet number:" << packetNumber << std::endl;
 										dataToReceive = false;
 										outBinaryfile.close();
+										remove(filename);
 										//fileOpened = false;
 										return false;
 									}
@@ -279,10 +298,18 @@ bool logReceiver::downLoadData(const char* filename)
 									if (dataLen >= 0) {
 										dataIndex += dataLen;
 										packetNumber++;
+
+										if(mDirectFileWrite)
+										{
+											outBinaryfile.write((char*)mDataIn,dataIndex);
+											dataIndex = 0;
+										}
+
 									} else {
 										cout << "Data Length error, aborting.."<< std::endl;
 										dataToReceive = false;
 										outBinaryfile.close();
+										remove(filename);
 										//fileOpened = false;
 										return false;
 									}
@@ -292,6 +319,7 @@ bool logReceiver::downLoadData(const char* filename)
 									cout << "Data type error, aborting.."<< std::endl;
 									dataToReceive = false;
 									outBinaryfile.close();
+									remove(filename);
 									//fileOpened = false;
 									return false;
 								}
@@ -320,6 +348,7 @@ bool logReceiver::downLoadData(const char* filename)
 				cout << "ERROR: Data reception timeout, aborting.."<< std::endl;
 				dataToReceive = false;
 				outBinaryfile.close();
+				remove(filename);
 				//fileOpened = false;
 				return false;
 			}
@@ -327,8 +356,12 @@ bool logReceiver::downLoadData(const char* filename)
 	}
 
 
-	cout << "Writing file"<< std::endl;
-	outBinaryfile.write((char*)mDataIn,dataIndex);
+
+	if(!mDirectFileWrite){
+		cout << "Writing file"<< std::endl;
+		outBinaryfile.write((char*)mDataIn,dataIndex);
+	}
+
 	outBinaryfile.close();
 	Sleep(100);
 
