@@ -62,9 +62,13 @@ cout << "\n\r ----------------STARTING------------------" << std::endl;
 logRx.openComm(5, 460800);
 
 vector<string> fileList;
+cout << "\n\r refreshing file list" << endl;
 int fileCount = logRx.refreshFileList();
 
+cout << "File count: " << fileCount;
+
 char filename[40];
+uint64_t startTime = getTimeMs();
 
 for(int i = 0; i < fileCount; i++)
 {
@@ -73,15 +77,32 @@ for(int i = 0; i < fileCount; i++)
 
 	logRx.downloadDataByName(filename);
 
-	//logRx.reset();
+}
+
+for(int i = 0; i < fileCount; i++)
+{
+
+	logRx.downloadDataByNumber(i);
 
 }
 
 
+cout << "\nTest mauvais nom de fichier:" << endl;
+logRx.downloadDataByName("mauvaisFichier.dat");
+
+cout << "\nTest mauvais numérro de fichier:" << endl;
+logRx.downloadDataByNumber(28);
+
+cout << "\nTest delete log" << endl;
+logRx.deleteAllLog();
 
 logRx.endComm();
+uint64_t endTime = getTimeMs();
 
-cout << "\nEnd of program" << std::endl;
+uint64_t runTime = endTime - startTime;
+
+
+cout << "\nEnd of program in " << runTime << "ms" << std::endl;
 
 	return 0;
 }

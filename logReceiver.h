@@ -40,6 +40,8 @@ public:
 	int getFileListCount();
 	int getFileName(int fileSelect,char* fileName);
 
+	void deleteAllLog();
+
 	bool downloadDataByNumber(int dataNumber);
 	bool downloadDataByName(const char* filename);
 
@@ -57,8 +59,6 @@ private:
 	uint32_t mMaxPacketLen = 0;
 	uint32_t mMaxDataBuffer = 0;
 	atComm *comm;
-
-	bool mDirectFileWrite = false;
 
 	HANDLE serialHandle;
 

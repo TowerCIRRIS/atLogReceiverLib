@@ -186,22 +186,31 @@ int logReceiver::getFileName(int fileSelect,char* fileName)
 	return -1;
 }
 
+void logReceiver::deleteAllLog()
+{
+	string deleteCommand = string("delete log\n");
+
+	flushPort(serialHandle);
+	write_port(serialHandle, (uint8_t*)deleteCommand.c_str(), deleteCommand.length());
+}
+
 
 bool logReceiver::downloadDataByNumber(int dataNumber)
 {
 
 	if(dataNumber >= getFileListCount())
 	{
-		cout << "Error: Number out of bound, or file list not up to date.  Make sure file list has been refreshed firts. "<< std::endl;
+		cout << "Error: Number out of bound, or file list not up to date.  Make sure file list has been refreshed first. "<< std::endl;
 		return false;
 	}
+
+	downloadDataByName(mFileList[dataNumber].c_str());
 }
 
 
 bool logReceiver::downloadDataByName(const char* filename)
 {
 
-	mDirectFileWrite = true;
 
 	if (string(filename).find(".dat") == std::string::npos)
 	{
@@ -299,11 +308,10 @@ bool logReceiver::downloadDataByName(const char* filename)
 										dataIndex += dataLen;
 										packetNumber++;
 
-										if(mDirectFileWrite)
-										{
-											outBinaryfile.write((char*)mDataIn,dataIndex);
-											dataIndex = 0;
-										}
+
+										outBinaryfile.write((char*)mDataIn,dataIndex);
+										dataIndex = 0;
+
 
 									} else {
 										cout << "Data Length error, aborting.."<< std::endl;
@@ -355,12 +363,6 @@ bool logReceiver::downloadDataByName(const char* filename)
 		}
 	}
 
-
-
-	if(!mDirectFileWrite){
-		cout << "Writing file"<< std::endl;
-		outBinaryfile.write((char*)mDataIn,dataIndex);
-	}
 
 	outBinaryfile.close();
 	Sleep(100);
