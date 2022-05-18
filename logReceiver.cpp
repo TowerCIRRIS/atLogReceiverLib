@@ -74,14 +74,13 @@ void logReceiver::endComm() {
 }
 
 
-bool logReceiver::reset()
-{
+void logReceiver::reset() {
 	comm->resetBuffer();
 
 	// Envoyer la commande pour ¸recevoir le data
 	flushPort(serialHandle);
-	write_port(serialHandle, (uint8_t*)"\r", 1); // in case something was typed before
-	Sleep(100);
+	write_port(serialHandle, (uint8_t*) "\r", 1); // in case something was typed before
+	Sleep(200);
 	flushPort(serialHandle);
 
 	bool dataToReceive = true;
@@ -92,16 +91,15 @@ bool logReceiver::reset()
 
 		readSize = read_port(serialHandle, (uint8_t*) inCharacter, 1);
 
-	if (readSize <= 0) {
+		if (readSize <= 0) {
 
-		dataToReceive = false;
+			dataToReceive = false;
+		}
+
+		dataIndex = 0;
+
 	}
 
-	dataIndex = 0;
-
-}
-
-	return true;
 }
 
 
@@ -114,6 +112,7 @@ int logReceiver::refreshFileList()
 	bool dataToReceive = true;
 	char inCharacter[10];
 
+	mFileList.clear();
 	while (dataToReceive) {
 
 		readSize = read_port(serialHandle, (uint8_t*) inCharacter, 1);
@@ -150,16 +149,12 @@ int logReceiver::refreshFileList()
 	size_t pos = 0;
 	std::string token;
 
-	//mFileCount = 0;
 	while ((pos = receivedData.find(delimiter)) != std::string::npos) {
 	    token = receivedData.substr(0, pos);
 
 	    if(token.find(".dat") != std::string::npos)
 	    {
 	    	mFileList.push_back(token);
-
-	    	// cout << "File name:" <<  token << endl;
-	    	//mFileCount++;
 	    }
 
 	    receivedData.erase(0, pos + delimiter.length());
@@ -177,7 +172,7 @@ int logReceiver::getFileListCount()
 
 int logReceiver::getFileName(int fileSelect,char* fileName)
 {
-	if(mFileList.size() > 0 && fileSelect < mFileList.size())
+	if(mFileList.size() > 0 && (unsigned int)fileSelect < mFileList.size())
 	{
 		strcpy(fileName, mFileList[fileSelect].c_str());
 		return mFileList[fileSelect].length();
@@ -186,12 +181,97 @@ int logReceiver::getFileName(int fileSelect,char* fileName)
 	return -1;
 }
 
+void logReceiver::startLog()
+{
+	string command = string("startlog\r");
+
+		flushPort(serialHandle);
+		write_port(serialHandle, (uint8_t*)command.c_str(), command.length());
+
+		bool dataToReceive = true;
+		char inCharacter[10];
+		SSIZE_T readSize;
+
+		Sleep(1000);
+		while (dataToReceive) {
+
+			readSize = read_port(serialHandle, (uint8_t*) inCharacter, 1);
+
+			if (readSize <= 0) {
+
+				dataToReceive = false;
+			}
+			else
+			{
+				//cout << inCharacter;
+			}
+		}
+
+		//cout << endl;
+
+}
+
+void logReceiver::stopLog()
+{
+	string command = string("stoplog\r");
+
+		flushPort(serialHandle);
+		write_port(serialHandle, (uint8_t*)command.c_str(), command.length());
+
+		bool dataToReceive = true;
+		char inCharacter[10];
+		SSIZE_T readSize;
+
+		Sleep(1000);
+
+		while (dataToReceive) {
+
+			readSize = read_port(serialHandle, (uint8_t*) inCharacter, 1);
+
+			if (readSize <= 0) {
+
+				dataToReceive = false;
+			}
+			else
+			{
+				//cout << inCharacter;
+			}
+		}
+
+		//cout << endl;
+
+}
+
+
 void logReceiver::deleteAllLog()
 {
-	string deleteCommand = string("delete log\n");
+	string deleteCommand = string("delete log\r");
 
 	flushPort(serialHandle);
 	write_port(serialHandle, (uint8_t*)deleteCommand.c_str(), deleteCommand.length());
+
+	Sleep(1000);
+
+	bool dataToReceive = true;
+		char inCharacter[10];
+		SSIZE_T readSize;
+
+		while (dataToReceive) {
+
+			readSize = read_port(serialHandle, (uint8_t*) inCharacter, 1);
+
+			if (readSize <= 0) {
+
+				dataToReceive = false;
+			}
+			else
+			{
+				//cout << inCharacter;
+			}
+		}
+
+		//cout << endl;
+
 }
 
 
@@ -204,7 +284,8 @@ bool logReceiver::downloadDataByNumber(int dataNumber)
 		return false;
 	}
 
-	downloadDataByName(mFileList[dataNumber].c_str());
+	return downloadDataByName(mFileList[dataNumber].c_str());
+
 }
 
 
@@ -218,7 +299,7 @@ bool logReceiver::downloadDataByName(const char* filename)
 		return false;
 	}
 
-	string downloadCommand = string("downloaddata ") + string(filename) + string("\n");
+	string downloadCommand = string("downloaddata ") + string(filename) + string("\r");
 
 	flushPort(serialHandle);
 	write_port(serialHandle, (uint8_t*)downloadCommand.c_str(), downloadCommand.length());
@@ -236,8 +317,6 @@ bool logReceiver::downloadDataByName(const char* filename)
 		cout << "ERROR: Unable to open output file"<< std::endl;
 		return false;
 	}
-
-	reset(); // reset pour le nouveau paquet;
 
 	uint32_t packetNumber = 0;
 	uint32_t rxPacketNumber = 0;
@@ -269,7 +348,7 @@ bool logReceiver::downloadDataByName(const char* filename)
 						dataToReceive = false;
 						outBinaryfile.close();
 						remove(filename);
-						//fileOpened = false;
+
 						return false;
 					}
 
@@ -296,7 +375,7 @@ bool logReceiver::downloadDataByName(const char* filename)
 										dataToReceive = false;
 										outBinaryfile.close();
 										remove(filename);
-										//fileOpened = false;
+
 										return false;
 									}
 									sendAck = true;
@@ -308,7 +387,6 @@ bool logReceiver::downloadDataByName(const char* filename)
 										dataIndex += dataLen;
 										packetNumber++;
 
-
 										outBinaryfile.write((char*)mDataIn,dataIndex);
 										dataIndex = 0;
 
@@ -318,7 +396,7 @@ bool logReceiver::downloadDataByName(const char* filename)
 										dataToReceive = false;
 										outBinaryfile.close();
 										remove(filename);
-										//fileOpened = false;
+
 										return false;
 									}
 								} else if (tempDataInfo.dataType == SDLOGGER_COMM_DATA_TYPE_EMPTY) {
@@ -328,7 +406,7 @@ bool logReceiver::downloadDataByName(const char* filename)
 									dataToReceive = false;
 									outBinaryfile.close();
 									remove(filename);
-									//fileOpened = false;
+
 									return false;
 								}
 							}

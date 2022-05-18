@@ -62,14 +62,16 @@ cout << "\n\r ----------------STARTING------------------" << std::endl;
 logRx.openComm(5, 460800);
 
 vector<string> fileList;
-cout << "\n\r refreshing file list" << endl;
-int fileCount = logRx.refreshFileList();
+int fileCount;
 
+cout << "\n\r refreshing file list" << endl;
+fileCount = logRx.refreshFileList();
 cout << "File count: " << fileCount;
 
 char filename[40];
 uint64_t startTime = getTimeMs();
 
+cout << "\nTest downloadDataByName:" << endl;
 for(int i = 0; i < fileCount; i++)
 {
 	logRx.getFileName(i, filename);
@@ -79,11 +81,10 @@ for(int i = 0; i < fileCount; i++)
 
 }
 
+cout << "\nTest downloadDataByNumber:" << endl;
 for(int i = 0; i < fileCount; i++)
 {
-
 	logRx.downloadDataByNumber(i);
-
 }
 
 
@@ -95,6 +96,42 @@ logRx.downloadDataByNumber(28);
 
 cout << "\nTest delete log" << endl;
 logRx.deleteAllLog();
+
+
+Sleep(5000);
+cout << "\nTest start log" << endl;
+logRx.startLog();
+
+Sleep(5000);
+
+cout << "\nTest stop log" << endl;
+logRx.stopLog();
+Sleep(1000);
+
+cout << "\nTest start log" << endl;
+logRx.startLog();
+
+Sleep(5000);
+
+cout << "\nTest stop log" << endl;
+logRx.stopLog();
+Sleep(1000);
+
+cout << "\nTest downloadDataByName post log :" << endl;
+
+fileCount = logRx.refreshFileList();
+
+cout << "File count: " << fileCount;
+
+for(int i = 0; i < fileCount; i++)
+{
+	logRx.getFileName(i, filename);
+	cout << "\nFile#" << i << ": " << filename << std::endl;
+
+	logRx.downloadDataByName(filename);
+
+}
+
 
 logRx.endComm();
 uint64_t endTime = getTimeMs();
